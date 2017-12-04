@@ -10,6 +10,7 @@ import javax.swing.*;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
 import javax.swing.text.DefaultCaret;
+import javax.xml.bind.DatatypeConverter;
 import java.awt.*;
 import java.awt.event.WindowEvent;
 import java.awt.event.WindowListener;
@@ -580,7 +581,9 @@ public class GUI extends javax.swing.JFrame {
                 if (client.out != null) {
                     if (userList.getSelectedIndex() == 0) {
                         synchronized (client.out) {
-                            client.out.writeObject(new Message(Message.MESSAGE_ALL, username, messageField.getText()));
+                            byte[] messageContent = client.encrypt(messageField.getText().getBytes("UTF-8"), client.sKey, client.iv);
+                            System.out.printf("CipherText: %s%n", DatatypeConverter.printHexBinary(messageContent));
+                            client.out.writeObject(new Message(Message.MESSAGE_ALL, username, messageContent));
                             messageTextArea.append("[" + username + "] " + messageField.getText() + "\n");
                         }
 
@@ -590,7 +593,8 @@ public class GUI extends javax.swing.JFrame {
                             client.out.writeObject(new Message(Message.KICK, recipient));
                         } else {
                             synchronized (client.out) {
-                                client.out.writeObject(new Message(Message.MESSAGE, recipient, messageField.getText(), username));
+                                byte[] messageContent = client.encrypt(messageField.getText().getBytes("UTF-8"), client.sKey, client.iv);
+                                client.out.writeObject(new Message(Message.MESSAGE, recipient, messageContent, username));
                             }
                         }
 
@@ -619,7 +623,7 @@ public class GUI extends javax.swing.JFrame {
     }//GEN-LAST:event_chooseDownFileButtonActionPerformed
 
     private void sendFileButtonActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_sendFileButtonActionPerformed
-        if (userList.getSelectedIndex() == 0) {
+        /*if (userList.getSelectedIndex() == 0) {
             messageTextArea.append("Sending files to all users not allowed.\n");
             return;
         } else if (listModel.getElementAt(userList.getSelectedIndex()).equals(username)) {
@@ -632,7 +636,7 @@ public class GUI extends javax.swing.JFrame {
             messageTextArea.append("Sent out upload request.\n");
         } catch (IOException ex) {
             Logger.getLogger(GUI.class.getName()).log(Level.SEVERE, null, ex);
-        }
+        }*/
     }//GEN-LAST:event_sendFileButtonActionPerformed
 
 

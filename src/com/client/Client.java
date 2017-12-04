@@ -2,7 +2,11 @@ package com.client;
 
 import com.shared.Message;
 
-import javax.swing.*;
+import javax.crypto.Cipher;
+import javax.crypto.KeyGenerator;
+import javax.crypto.SecretKey;
+import javax.crypto.spec.IvParameterSpec;
+import javax.xml.bind.DatatypeConverter;
 import java.io.File;
 import java.io.IOException;
 import java.io.ObjectInputStream;
@@ -10,6 +14,9 @@ import java.io.ObjectOutputStream;
 import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.net.SocketTimeoutException;
+import java.security.KeyFactory;
+import java.security.PublicKey;
+import java.security.spec.X509EncodedKeySpec;
 import java.util.ArrayList;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -31,11 +38,14 @@ public class Client {
     public long byteCounter = 0;
     public long byteLength = 0;
     public Socket clientSocket;
-
+    SecretKey sKey;
+    PublicKey pubKey;
+    IvParameterSpec iv;
     public Client(GUI gui, String ip) {
         this.gui = gui;
         this.ip = ip;
-
+        sKey = generateAESKey();
+        System.out.printf("Client Key: %s%n",DatatypeConverter.printHexBinary(sKey.getEncoded()));
     }
 
     public void startClient() {
@@ -51,6 +61,16 @@ public class Client {
             gui.messageTextArea.append("Connected to server." + "\n");
             out = new ObjectOutputStream(clientSocket.getOutputStream());
             in = new ObjectInputStream(clientSocket.getInputStream());
+
+            // Encryption setup
+            waitForPubKey(in);
+            byte[] encryptedSecretKey = RSAEncrypt(sKey.getEncoded());
+            int size = encryptedSecretKey.length;
+            out.writeInt(size);
+            out.flush();
+            out.write(encryptedSecretKey);
+            out.flush();
+
             connected = true;
             out.writeObject(new Message(Message.LOGON, gui.usernameField.getText()));
             gui.username = gui.usernameField.getText();
@@ -62,6 +82,10 @@ public class Client {
                     try {
                         while (connected) {
                             Message message = (Message) in.readObject();
+                            if(message.content != null) {
+                                System.out.printf("CipherText: %s%n", DatatypeConverter.printHexBinary(message.content));
+                                message.content = decrypt(message.content, sKey, iv);
+                            }
                             System.out.println("Received message.");
                             switch (message.type) {
                                 case Message.MESSAGE_ALL:
@@ -109,16 +133,16 @@ public class Client {
                                 case Message.SERVER_SHUTDOWN:
                                     closeClient();
                                     break;
-                                case Message.UPLOAD_REQ:
+                                /*case Message.UPLOAD_REQ:
                                     System.out.println("Received upload request");
                                     if (downloading) {
-                                        out.writeObject(new Message(Message.UPLOAD_DENY, message.username, "", gui.username));
+                                        out.writeObject(new Message(Message.UPLOAD_DENY, message.username, new byte[0], gui.username));
                                         break;
                                     }
                                     int x = JOptionPane.showConfirmDialog(gui, message.username + " would like to send you " + message.content + " (" + (message.getFileLength() / 1024 / 1024) + "MB)", "Download Request", JOptionPane.YES_NO_OPTION);
                                     if (x == JOptionPane.YES_OPTION) {
                                         JFileChooser fileChooser = new JFileChooser();
-                                        fileChooser.setSelectedFile(new File(message.getContent()));
+                                        fileChooser.setSelectedFile(new File(new String(message.getContent())));
                                         int i = fileChooser.showSaveDialog(gui);
                                         if (i == JFileChooser.APPROVE_OPTION) {
                                             fileToSaveTo = fileChooser.getSelectedFile();
@@ -145,7 +169,7 @@ public class Client {
                                         out.writeObject(new Message(Message.UPLOAD_DENY, message.username, "", gui.username));
                                         System.out.println("No sent to user.");
                                     }
-                                    break;
+                                    break;*/
                                 case Message.UPLOAD_ACCEPT:
                                     System.out.println("Received upload accept");
                                     gui.fileTextField.setEditable(false);
@@ -191,11 +215,71 @@ public class Client {
             gui.messageTextArea.append("Could not connect to server." + "\n");
         }
 
+    }
 
+    public SecretKey generateAESKey(){
+        try{
+            KeyGenerator keyGen = KeyGenerator.getInstance("AES");
+            keyGen.init(128);
+            SecretKey secKey = keyGen.generateKey();
+            return secKey;
+        }catch(Exception e){
+            System.out.println("Key Generation Exception");
+            return null;
+        }
+    }
+
+    public byte[] RSAEncrypt(byte[] plaintext) throws IOException {
+        try {
+            Cipher c = Cipher.getInstance("RSA/ECB/OAEPWithSHA-1AndMGF1Padding");
+            c.init(Cipher.ENCRYPT_MODE, pubKey);
+            byte[] ciphertext = c.doFinal(plaintext);
+            return ciphertext;
+        } catch (Exception e) {
+            System.out.println("RSA Encrypt Exception");
+            return null;
+        }
+    }
+
+    public byte[] encrypt(byte[] plaintext, SecretKey secKey, IvParameterSpec iv){
+        try{
+            Cipher c = Cipher.getInstance("AES/CBC/PKCS5Padding");
+            c.init(Cipher.ENCRYPT_MODE,secKey,iv);
+            byte[] ciphertext = c.doFinal(plaintext);
+            return ciphertext;
+        }catch(Exception e){
+            System.out.println("AES Encrypt Exception");
+            return null;
+        }
+    }
+    public byte[] decrypt(byte[] ciphertext, SecretKey secKey, IvParameterSpec iv){
+        try{
+            Cipher c = Cipher.getInstance("AES/CBC/PKCS5Padding");
+            c.init(Cipher.DECRYPT_MODE,secKey,iv);
+            byte[] plaintext = c.doFinal(ciphertext);
+            return plaintext;
+        }catch(Exception e){
+            System.out.println("AES Decrypt Exception");
+            return null;
+        }
+    }
+
+    private void waitForPubKey(ObjectInputStream in){
+        try{
+            byte[] info = new byte[294];
+            in.read(info);
+            X509EncodedKeySpec keyspec = new X509EncodedKeySpec(info);
+            KeyFactory rsafactory = KeyFactory.getInstance("RSA");
+            pubKey = rsafactory.generatePublic(keyspec);
+            byte[] secureBytes = new byte[16];
+            in.read(secureBytes);
+            iv = new IvParameterSpec(secureBytes);
+        } catch(Exception e){
+            System.out.println("Public Key Exception");
+        }
     }
 
     public void closeClient() throws IOException {
-
         clientSocket.close();
         connected = false;
         gui.listModel.clear();

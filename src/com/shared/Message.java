@@ -9,7 +9,7 @@ public class Message implements Serializable {
     public int position;
     public int type;
     public String recipient;
-    public String content;
+    public byte[] content;
     public String username;
     public List<String> usernames;
     public byte[] fileData;
@@ -29,7 +29,7 @@ public class Message implements Serializable {
      * @param username  The username of the sender.
      */
     //Message.MESSAGE
-    public Message(int type, String recipient, String content, String username) {
+    public Message(int type, String recipient, byte[] content, String username) {
         this.type = type;
         this.recipient = recipient;
         this.content = content;
@@ -49,7 +49,7 @@ public class Message implements Serializable {
     }
 
     //Message.ALL
-    public Message(int type, String username, String content) {
+    public Message(int type, String username, byte[] content) {
         this.type = type;
         this.username = username;
         this.content = content;
@@ -71,7 +71,7 @@ public class Message implements Serializable {
     }
 
     //Message.UPLOAD_REQ
-    public Message(int type, String recipient, String content, long dataLength, String username) {
+    public Message(int type, String recipient, byte[] content, long dataLength, String username) {
         this.type = type;
         this.recipient = recipient;
         this.content = content;
@@ -95,7 +95,7 @@ public class Message implements Serializable {
         return recipient;
     }
 
-    public String getContent() {
+    public byte[] getContent() {
         return content;
     }
 
@@ -105,6 +105,6 @@ public class Message implements Serializable {
 
     @Override
     public String toString() {
-        return "[" + username + "] " + content;
+        return "[" + username + "] " + new String(content);
     }
 }

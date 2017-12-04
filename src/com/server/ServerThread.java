@@ -2,6 +2,11 @@ package com.server;
 
 import com.shared.Message;
 
+import javax.crypto.Cipher;
+import javax.crypto.SecretKey;
+import javax.crypto.spec.IvParameterSpec;
+import javax.crypto.spec.SecretKeySpec;
+import javax.xml.bind.DatatypeConverter;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
@@ -27,15 +32,41 @@ public class ServerThread extends Thread {
     public boolean connected;
     public int position;
     public String username;
-
-    public ServerThread(GUI gui, Socket clientSocket, ThreadHandler server) {
+    public Crypto crypto;
+    SecretKey clientSecretKey;
+    byte[] secureBytes;
+    IvParameterSpec iv;
+    public ServerThread(GUI gui, Socket clientSocket, ThreadHandler server, Crypto crypto, byte[] secureBytes) {
         this.gui = gui;
         this.clientSocket = clientSocket;
         this.server = server;
+        this.crypto = crypto;
+        this.secureBytes = secureBytes;
+        this.iv = new IvParameterSpec(secureBytes);
     }
 
     public synchronized void sendMessage(Message message) throws IOException {
         out.writeObject(message);
+    }
+
+    public synchronized void sendEncryptedMessage(int type, Message message) throws IOException {
+        if(type == Message.MESSAGE_ALL) {
+            Message copy = new Message(Message.MESSAGE_ALL, username, message.content.clone());
+            if(copy.content != null) {
+                byte ciphertext[] = encrypt(copy.content, clientSecretKey, iv);
+                copy.content = ciphertext;
+                System.out.println("Sent message: " + new String(copy.content, "UTF-8"));
+            }
+            out.writeObject(copy);
+        } else {
+            Message copy = new Message(Message.MESSAGE, message.recipient, message.content.clone(), message.username);
+            if(copy.content != null) {
+                byte ciphertext[] = encrypt(copy.content, clientSecretKey, iv);
+                copy.content = ciphertext;
+                System.out.println("Sent message: " + new String(copy.content, "UTF-8"));
+            }
+            out.writeObject(copy);
+        }
     }
 
     public void run() {
@@ -44,27 +75,43 @@ public class ServerThread extends Thread {
             out = new ObjectOutputStream(clientSocket.getOutputStream());
             in = new ObjectInputStream(clientSocket.getInputStream());
             connected = true;
+            byte[] keyBytes = crypto.getPublicKey().getEncoded();
+            System.out.println(keyBytes.length);
+            out.write(keyBytes);
+            out.flush();
+            out.write(secureBytes);
+            out.flush();
+            int size = in.readInt();
+            byte[] encryptedSecret = new byte[size];
+            in.read(encryptedSecret, 0, size);
+
+            // Get the clients symmetric key
+            byte decryptedSecret[] = crypto.RSADecrypt(encryptedSecret);
+            clientSecretKey = new SecretKeySpec(decryptedSecret,"AES");
+            System.out.printf("Client Key: %s%n",DatatypeConverter.printHexBinary(clientSecretKey.getEncoded()));
+
             while (connected) {
                 try {
                     Message message = (Message) in.readObject();
-                    System.out.println("Received Message");
+                    if(message.content != null && message.content.length > 0) {
+                        System.out.printf("CipherText: %s%n",DatatypeConverter.printHexBinary(message.content));
+                        message.content = decrypt(message.content, clientSecretKey, iv);
+                        System.out.println("Received Message: " + new String(message.content, "UTF-8"));
+                    }
+
                     switch (message.type) {
                         case Message.MESSAGE:
                             for (int i = 0; i < ThreadHandler.serverThreads.size(); i++) {
                                 if (ThreadHandler.serverThreads.get(i).username.equals(message.recipient)) {
-                                    ThreadHandler.serverThreads.get(i).sendMessage(message);
+                                    ThreadHandler.serverThreads.get(i).sendEncryptedMessage(Message.MESSAGE, message);
                                 }
                             }
 
                             break;
                         case Message.MESSAGE_ALL:
                             for (int i = 0; i < ThreadHandler.serverThreads.size(); i++) {
-                                if (ThreadHandler.serverThreads.get(i) != null) {
-
-                                    {
-                                        if (ThreadHandler.serverThreads.get(i) != this)
-                                            ThreadHandler.serverThreads.get(i).sendMessage(message);
-                                    }
+                                if (ThreadHandler.serverThreads.get(i) != null && ThreadHandler.serverThreads.get(i) != this) {
+                                    ThreadHandler.serverThreads.get(i).sendEncryptedMessage(Message.MESSAGE_ALL, message);
                                 }
                             }
                             System.out.println("Sent message to users.");
@@ -149,7 +196,29 @@ public class ServerThread extends Thread {
         }
 
     }
+    public byte[] encrypt(byte[] plaintext, SecretKey secKey, IvParameterSpec iv){
+        try{
+            Cipher c = Cipher.getInstance("AES/CBC/PKCS5Padding");
+            c.init(Cipher.ENCRYPT_MODE,secKey,iv);
+            byte[] ciphertext = c.doFinal(plaintext);
+            return ciphertext;
+        }catch(Exception e){
+            System.out.println("AES Encrypt Exception");
+            return null;
+        }
+    }
 
+    public byte[] decrypt(byte[] ciphertext, SecretKey secKey, IvParameterSpec iv){
+        try{
+            Cipher c = Cipher.getInstance("AES/CBC/PKCS5Padding");
+            c.init(Cipher.DECRYPT_MODE,secKey,iv);
+            byte[] plaintext = c.doFinal(ciphertext);
+            return plaintext;
+        }catch(Exception e){
+            System.out.println("AES Decrypt Exception");
+            return null;
+        }
+    }
     public void close() {
         try {
 

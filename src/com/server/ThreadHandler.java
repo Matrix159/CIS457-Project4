@@ -3,6 +3,9 @@ package com.server;
 
 import java.io.IOException;
 import java.net.ServerSocket;
+import java.security.PrivateKey;
+import java.security.PublicKey;
+import java.security.SecureRandom;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -18,18 +21,28 @@ public class ThreadHandler {
     public static GUI gui;
     public Thread thread;
     public ThreadHandler server = this;
-
+    public Crypto crypto = new Crypto();
+    public PublicKey pubKey;
+    public PrivateKey privKey;
+    public byte[] secureBytes = new byte[16];
     public ThreadHandler(GUI theGui) {
         try {
+            //Generate public and private keys.
+            crypto.setPublicKey("RSApub.der");
+            crypto.setPrivateKey("RSApriv.der");
+            pubKey = crypto.getPublicKey();
+            privKey = crypto.getPrivateKey();
+            SecureRandom r = new SecureRandom();
+            r.nextBytes(secureBytes);
             gui = theGui;
             serverSocket = new ServerSocket(44444);
             thread = new Thread(() -> {
                 while (running) {
                     try {
-                        ServerThread serverThread = new ServerThread(gui, serverSocket.accept(), server);
+                        ServerThread serverThread = new ServerThread(gui, serverSocket.accept(), server, crypto, secureBytes);
                         serverThreads.add(serverThread);
                         serverThread.start();
-                    } catch (IOException ex) {
+                    } catch (Exception ex) {
                         Logger.getLogger(ThreadHandler.class.getName()).log(Level.SEVERE, null, ex);
                     }
 
