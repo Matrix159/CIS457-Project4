@@ -40,7 +40,6 @@ public class Client {
     public Socket clientSocket;
     SecretKey sKey;
     PublicKey pubKey;
-    IvParameterSpec iv;
     public Client(GUI gui, String ip) {
         this.gui = gui;
         this.ip = ip;
@@ -271,9 +270,6 @@ public class Client {
             X509EncodedKeySpec keyspec = new X509EncodedKeySpec(info);
             KeyFactory rsafactory = KeyFactory.getInstance("RSA");
             pubKey = rsafactory.generatePublic(keyspec);
-            byte[] secureBytes = new byte[16];
-            in.read(secureBytes);
-            iv = new IvParameterSpec(secureBytes);
         } catch(Exception e){
             System.out.println("Public Key Exception");
         }

@@ -35,15 +35,12 @@ public class ServerThread extends Thread {
     public String username;
     public Crypto crypto;
     SecretKey clientSecretKey;
-    byte[] secureBytes;
-    IvParameterSpec iv;
-    public ServerThread(GUI gui, Socket clientSocket, ThreadHandler server, Crypto crypto, byte[] secureBytes) {
+
+    public ServerThread(GUI gui, Socket clientSocket, ThreadHandler server, Crypto crypto) {
         this.gui = gui;
         this.clientSocket = clientSocket;
         this.server = server;
         this.crypto = crypto;
-        this.secureBytes = secureBytes;
-        this.iv = new IvParameterSpec(secureBytes);
     }
 
     public synchronized void sendMessage(Message message) throws IOException {
@@ -56,7 +53,7 @@ public class ServerThread extends Thread {
         r.nextBytes(secureRandomBytes);
 
         if(type == Message.MESSAGE_ALL) {
-            Message copy = new Message(Message.MESSAGE_ALL, username, message.content.clone(), secureRandomBytes);
+            Message copy = new Message(Message.MESSAGE_ALL, message.username, message.content.clone(), secureRandomBytes);
             if(copy.content != null) {
                 byte ciphertext[] = encrypt(copy.content, clientSecretKey, new IvParameterSpec(secureRandomBytes));
                 copy.content = ciphertext;
@@ -83,8 +80,6 @@ public class ServerThread extends Thread {
             byte[] keyBytes = crypto.getPublicKey().getEncoded();
             System.out.println(keyBytes.length);
             out.write(keyBytes);
-            out.flush();
-            out.write(secureBytes);
             out.flush();
             int size = in.readInt();
             byte[] encryptedSecret = new byte[size];

@@ -24,7 +24,6 @@ public class ThreadHandler {
     public Crypto crypto = new Crypto();
     public PublicKey pubKey;
     public PrivateKey privKey;
-    public byte[] secureBytes = new byte[16];
     public ThreadHandler(GUI theGui) {
         try {
             //Generate public and private keys.
@@ -32,14 +31,12 @@ public class ThreadHandler {
             crypto.setPrivateKey("RSApriv.der");
             pubKey = crypto.getPublicKey();
             privKey = crypto.getPrivateKey();
-            SecureRandom r = new SecureRandom();
-            r.nextBytes(secureBytes);
             gui = theGui;
             serverSocket = new ServerSocket(44444);
             thread = new Thread(() -> {
                 while (running) {
                     try {
-                        ServerThread serverThread = new ServerThread(gui, serverSocket.accept(), server, crypto, secureBytes);
+                        ServerThread serverThread = new ServerThread(gui, serverSocket.accept(), server, crypto);
                         serverThreads.add(serverThread);
                         serverThread.start();
                     } catch (Exception ex) {
