@@ -11,6 +11,7 @@ import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.net.Socket;
+import java.security.SecureRandom;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -50,18 +51,22 @@ public class ServerThread extends Thread {
     }
 
     public synchronized void sendEncryptedMessage(int type, Message message) throws IOException {
+        SecureRandom r = new SecureRandom();
+        byte[] secureRandomBytes = new byte[16];
+        r.nextBytes(secureRandomBytes);
+
         if(type == Message.MESSAGE_ALL) {
-            Message copy = new Message(Message.MESSAGE_ALL, username, message.content.clone());
+            Message copy = new Message(Message.MESSAGE_ALL, username, message.content.clone(), secureRandomBytes);
             if(copy.content != null) {
-                byte ciphertext[] = encrypt(copy.content, clientSecretKey, iv);
+                byte ciphertext[] = encrypt(copy.content, clientSecretKey, new IvParameterSpec(secureRandomBytes));
                 copy.content = ciphertext;
                 System.out.println("Sent message: " + new String(copy.content, "UTF-8"));
             }
             out.writeObject(copy);
         } else {
-            Message copy = new Message(Message.MESSAGE, message.recipient, message.content.clone(), message.username);
+            Message copy = new Message(Message.MESSAGE, message.recipient, message.content.clone(), message.username, secureRandomBytes);
             if(copy.content != null) {
-                byte ciphertext[] = encrypt(copy.content, clientSecretKey, iv);
+                byte ciphertext[] = encrypt(copy.content, clientSecretKey, new IvParameterSpec(secureRandomBytes));
                 copy.content = ciphertext;
                 System.out.println("Sent message: " + new String(copy.content, "UTF-8"));
             }
@@ -95,7 +100,7 @@ public class ServerThread extends Thread {
                     Message message = (Message) in.readObject();
                     if(message.content != null && message.content.length > 0) {
                         System.out.printf("CipherText: %s%n",DatatypeConverter.printHexBinary(message.content));
-                        message.content = decrypt(message.content, clientSecretKey, iv);
+                        message.content = decrypt(message.content, clientSecretKey, new IvParameterSpec(message.secureRandom));
                         System.out.println("Received Message: " + new String(message.content, "UTF-8"));
                     }
 

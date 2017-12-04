@@ -84,7 +84,7 @@ public class Client {
                             Message message = (Message) in.readObject();
                             if(message.content != null) {
                                 System.out.printf("CipherText: %s%n", DatatypeConverter.printHexBinary(message.content));
-                                message.content = decrypt(message.content, sKey, iv);
+                                message.content = decrypt(message.content, sKey, new IvParameterSpec(message.secureRandom));
                             }
                             System.out.println("Received message.");
                             switch (message.type) {

@@ -6,6 +6,7 @@ package com.client;
 
 import com.shared.Message;
 
+import javax.crypto.spec.IvParameterSpec;
 import javax.swing.*;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
@@ -16,6 +17,7 @@ import java.awt.event.WindowEvent;
 import java.awt.event.WindowListener;
 import java.io.*;
 import java.net.URL;
+import java.security.SecureRandom;
 import java.util.Properties;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -581,9 +583,13 @@ public class GUI extends javax.swing.JFrame {
                 if (client.out != null) {
                     if (userList.getSelectedIndex() == 0) {
                         synchronized (client.out) {
-                            byte[] messageContent = client.encrypt(messageField.getText().getBytes("UTF-8"), client.sKey, client.iv);
+                            SecureRandom random = new SecureRandom();
+                            byte[] secureRandomBytes = new byte[16];
+                            random.nextBytes(secureRandomBytes);
+                            byte[] messageContent = client.encrypt(messageField.getText().getBytes("UTF-8"), client.sKey, new IvParameterSpec(secureRandomBytes));
                             System.out.printf("CipherText: %s%n", DatatypeConverter.printHexBinary(messageContent));
-                            client.out.writeObject(new Message(Message.MESSAGE_ALL, username, messageContent));
+
+                            client.out.writeObject(new Message(Message.MESSAGE_ALL, username, messageContent, secureRandomBytes));
                             messageTextArea.append("[" + username + "] " + messageField.getText() + "\n");
                         }
 
@@ -593,8 +599,11 @@ public class GUI extends javax.swing.JFrame {
                             client.out.writeObject(new Message(Message.KICK, recipient));
                         } else {
                             synchronized (client.out) {
-                                byte[] messageContent = client.encrypt(messageField.getText().getBytes("UTF-8"), client.sKey, client.iv);
-                                client.out.writeObject(new Message(Message.MESSAGE, recipient, messageContent, username));
+                                SecureRandom random = new SecureRandom();
+                                byte[] secureRandomBytes = new byte[16];
+                                random.nextBytes(secureRandomBytes);
+                                byte[] messageContent = client.encrypt(messageField.getText().getBytes("UTF-8"), client.sKey, new IvParameterSpec(secureRandomBytes));
+                                client.out.writeObject(new Message(Message.MESSAGE, recipient, messageContent, username, secureRandomBytes));
                             }
                         }
 

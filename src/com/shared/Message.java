@@ -13,6 +13,7 @@ public class Message implements Serializable {
     public String username;
     public List<String> usernames;
     public byte[] fileData;
+    public byte[] secureRandom;
     public long dataLength;
     public int bytesSent;
     public final static int MESSAGE = 0, MESSAGE_ALL = 1, LOGON = 2, LOGOUT = 3
@@ -29,11 +30,12 @@ public class Message implements Serializable {
      * @param username  The username of the sender.
      */
     //Message.MESSAGE
-    public Message(int type, String recipient, byte[] content, String username) {
+    public Message(int type, String recipient, byte[] content, String username, byte[] secureRandom) {
         this.type = type;
         this.recipient = recipient;
         this.content = content;
         this.username = username;
+        this.secureRandom = secureRandom;
     }
 
     //Message.LOGON to client
@@ -49,10 +51,11 @@ public class Message implements Serializable {
     }
 
     //Message.ALL
-    public Message(int type, String username, byte[] content) {
+    public Message(int type, String username, byte[] content, byte[] secureRandom) {
         this.type = type;
         this.username = username;
         this.content = content;
+        this.secureRandom = secureRandom;
     }
 
     //Message.SERVER_SHUTDOWN
