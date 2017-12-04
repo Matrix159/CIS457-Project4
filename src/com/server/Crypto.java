@@ -17,30 +17,6 @@ import java.security.spec.X509EncodedKeySpec;
 class Crypto {
     private PrivateKey privKey;
     private PublicKey pubKey;
-
-    public static void main(String args[]){
-	    Crypto c = new Crypto();
-	    c.setPrivateKey("RSApriv.der");
-	    c.setPublicKey("RSApub.der");
-
-	    SecretKey s = c.generateAESKey();
-	    byte encryptedsecret[] = c.RSAEncrypt(s.getEncoded());
-
-        byte decryptedsecret[] = c.RSADecrypt(encryptedsecret);
-		SecureRandom r = new SecureRandom();
-		r.setSeed(555);
-	    byte ivbytes[] = new byte[16];
-	    r.nextBytes(ivbytes);
-	    IvParameterSpec iv = new IvParameterSpec(ivbytes);
-
-	    String plaintext = "This is a test string to encrypt";
-	    //byte ciphertext[] = c.encrypt(plaintext.getBytes(),s, Constants.IV);
-	    //System.out.printf("CipherText: %s%n",DatatypeConverter.printHexBinary(ciphertext));
-	    SecretKey ds = new SecretKeySpec(decryptedsecret,"AES");
-	    //byte decryptedplaintext[] = c.decrypt(ciphertext,ds,Constants.IV);
-	    //String dpt = new String(decryptedplaintext);
-	    //System.out.printf("PlainText: %s%n",dpt);
-    }
     
     public Crypto(){
 	    privKey=null;
